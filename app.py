@@ -307,21 +307,30 @@ with tabD:
 
     full_range = st.checkbox("Show full range", value=False)
 
-    min_d = declared_dated["date"].min()
-    max_d = declared_dated["date"].max()
+    # 全部用 Python 原生 date 对象，不碰 Timestamp
+    min_d = declared_dated["date"].min().date()
+    max_d = declared_dated["date"].max().date()
+    default_start = (max_d - pd.DateOffset(months=12)).date()
+
     if not full_range:
-        start, end = st.slider(
-            "Select date range",
-            min_value=min_d, max_value=max_d,
-            value=(max_d - pd.DateOffset(months=12), max_d),
-            format="YYYY-MM"
-        )
+        col1, col2 = st.columns(2)
+        with col1:
+            start = st.date_input(
+                "Start date", value=default_start,
+                min_value=min_d, max_value=max_d
+            )
+        with col2:
+            end = st.date_input(
+                "End date", value=max_d,
+                min_value=min_d, max_value=max_d
+            )
+        start_ts, end_ts = pd.Timestamp(start), pd.Timestamp(end)
     else:
-        start, end = min_d, max_d
+        start_ts, end_ts = declared_dated["date"].min(), declared_dated["date"].max()
 
     def filtered_range(who):
         d = declared_dated[declared_dated["country"].isin(who)]
-        return d[(d["date"] >= start) & (d["date"] <= end)]
+        return d[(d["date"] >= start_ts) & (d["date"] <= end_ts)]
 
     fig = px.bar(
         filtered_range([country]), x="date", y="net_purchases_t",
@@ -340,7 +349,7 @@ with tabD:
         b = st.selectbox("Second country",
                          [c for c in countries if c != a], index=0, key="cb")
 
-    rng = f"{start:%Y-%m} to {end:%Y-%m}"
+    rng = f"{start_ts:%Y-%m} to {end_ts:%Y-%m}"
     fig2 = px.bar(
         filtered_range([a, b]), x="date", y="net_purchases_t", color="country",
         labels={"date": "Month", "net_purchases_t": "Tonnes"},
